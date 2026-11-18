@@ -71,7 +71,7 @@ export default function Home() {
       <section className="services-section section-pad" id="hizmetler">
         <div className="shell">
           <div className="section-heading">
-            <div><p className="eyebrow"><span className="eyebrow-line"></span> MENÜMÜZ</p><h2>İyi hissettiren<br /><em>dokunuşlar.</em></h2></div>
+            <div><p className="eyebrow"><span className="eyebrow-line"></span> PAKETLERİMİZ</p><h2>İyi hissettiren<br /><em>dokunuşlar.</em></h2></div>
             <p className="section-intro">İhtiyacınıza uygun hizmeti seçin. Her randevuda aynı özen, her detayda size göre bir yaklaşım.</p>
           </div>
           <div className="service-grid">
