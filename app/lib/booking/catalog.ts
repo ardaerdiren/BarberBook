@@ -12,7 +12,7 @@ export const services: Service[] = [
   { id: "beard", number: "02", name: "Sakal Kesimi", description: "Net hatlar ve dengeli bir form.", durationMinutes: 20, priceTry: 200 },
   { id: "care", number: "03", name: "Bakım", description: "Kendinize ayırdığınız kısa bir yenilenme molası.", durationMinutes: 10, priceTry: 300 },
   { id: "haircut-beard", number: "04", name: "Saç + Sakal", description: "Bir arada, baştan sona tamamlanmış bir görünüm.", durationMinutes: 60, priceTry: 900 },
-  { id: "complete-care", number: "05", name: "Saç + Sakal + Bakım", description: "Tam bir berber deneyimi, tek seansta.", durationMinutes: 60, priceTry: 1000 },
+  { id: "complete-care", number: "05", name: "Saç + Sakal + Bakım", description: "Tam bir berber deneyimi, tek seansta.", durationMinutes: 80, priceTry: 1000 },
 ];
 
 export const barbers = [

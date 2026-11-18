@@ -76,8 +76,9 @@ export default function Home() {
           </div>
           <div className="service-grid">
             {services.map((service) => (
-              <article className="service-card" key={service.number}>
+              <article className={`service-card ${service.id === "complete-care" ? "service-card-campaign" : ""}`} key={service.number}>
                 <div className="service-card-top"><span>{service.number}</span><span className="service-arrow" aria-hidden="true">↗</span></div>
+                {service.id === "complete-care" && <span className="campaign-label home-campaign-label">Kampanyalı Paket</span>}
                 <h3>{service.name}</h3><p>{service.description}</p>
                 <div className="service-price"><span>{service.durationMinutes} DK</span><strong>{formatPrice(service.priceTry)}</strong></div>
               </article>
