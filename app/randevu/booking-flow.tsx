@@ -57,12 +57,28 @@ const sampleAppointment = {
   serviceId: "haircut",
 };
 const weekdays = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const bookingTimeZone = "Europe/Istanbul";
 
 function localDateValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: bookingTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function addCalendarDays(dateValue: string, days: number) {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function dateWindowError(dateValue: string, todayValue: string) {
+  if (dateValue < todayValue) return "Geçmiş bir tarih seçilemez.";
+  if (dateValue > addCalendarDays(todayValue, 7)) return "En fazla 7 gün sonrasına randevu seçebilirsiniz.";
+  return "";
 }
 
 function createTimeSlots(durationMinutes: number) {
@@ -106,7 +122,7 @@ function capitalizeName(value: string) {
 function displayDate(dateValue: string) {
   if (!dateValue) return "";
   const [year, month, day] = dateValue.split("-").map(Number);
-  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric" }).format(new Date(year, month - 1, day));
+  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", year: "numeric", timeZone: bookingTimeZone }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
 export default function BookingFlow() {
@@ -183,8 +199,8 @@ export default function BookingFlow() {
   );
   const calendarCells = useMemo(() => {
     const { year, month } = calendarMonth;
-    const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstWeekday = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
     return [...Array<number | null>(firstWeekday).fill(null), ...Array.from({ length: daysInMonth }, (_, index) => index + 1)];
   }, [calendarMonth]);
 
@@ -203,7 +219,12 @@ export default function BookingFlow() {
     if (step === 1 && !draft.serviceId) nextErrors.serviceId = "Devam etmek için bir hizmet seçin.";
     if (step === 2) {
       if (!draft.date) nextErrors.date = "Lütfen bir tarih seçin.";
-      else if (today && draft.date < today) nextErrors.date = "Geçmiş bir tarih seçilemez.";
+      else {
+        const todayValue = localDateValue(new Date());
+        setToday(todayValue);
+        const rangeError = dateWindowError(draft.date, todayValue);
+        if (rangeError) nextErrors.date = rangeError;
+      }
     }
     if (step === 3 && !draft.time) nextErrors.time = "Devam etmek için bir saat seçin.";
     if (step === 4) {
@@ -221,10 +242,10 @@ export default function BookingFlow() {
     event?.preventDefault();
     if (!validateCurrentStep()) return;
     if (step === 1) {
-      const now = new Date();
-      const todayValue = localDateValue(now);
+      const todayValue = localDateValue(new Date());
+      const [year, month] = todayValue.split("-").map(Number);
       setToday(todayValue);
-      if (!draft.date) setCalendarMonth({ year: now.getFullYear(), month: now.getMonth() });
+      if (!draft.date) setCalendarMonth({ year, month: month - 1 });
     }
     setStep((current) => Math.min(current + 1, stepNames.length - 1));
   }
@@ -235,9 +256,12 @@ export default function BookingFlow() {
   }
 
   function changeDate(value: string) {
-    if (value && value < localDateValue(new Date())) {
+    const todayValue = localDateValue(new Date());
+    setToday(todayValue);
+    const rangeError = value ? dateWindowError(value, todayValue) : "";
+    if (rangeError) {
       select("date", "");
-      setErrors((current) => ({ ...current, date: "Geçmiş bir tarih seçilemez." }));
+      setErrors((current) => ({ ...current, date: rangeError }));
       return;
     }
     select("date", value);
@@ -359,7 +383,7 @@ export default function BookingFlow() {
               </fieldset>
             ))}
 
-            {step === 2 && <div className="calendar-step"><div className="calendar-head"><button type="button" aria-label="Önceki ay" disabled={Boolean(today && calendarMonth.year === Number(today.slice(0, 4)) && calendarMonth.month === Number(today.slice(5, 7)) - 1)} onClick={() => setCalendarMonth((month) => { const previous = new Date(month.year, month.month - 1, 1); return { year: previous.getFullYear(), month: previous.getMonth() }; })}>←</button><h3>{new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(calendarMonth.year, calendarMonth.month, 1))}</h3><button type="button" aria-label="Sonraki ay" onClick={() => setCalendarMonth((month) => { const next = new Date(month.year, month.month + 1, 1); return { year: next.getFullYear(), month: next.getMonth() }; })}>→</button></div><div className="calendar-grid" role="group" aria-label="Tarih seçimi">{weekdays.map((day) => <span className="calendar-weekday" key={day}>{day}</span>)}{calendarCells.map((day, index) => day === null ? <span className="calendar-empty" key={`empty-${index}`} aria-hidden="true"></span> : (() => { const dateValue = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const isPast = Boolean(today && dateValue < today); const isSelected = draft.date === dateValue; const isToday = Boolean(today && dateValue === today); return <button type="button" aria-pressed={isSelected} aria-label={displayDate(dateValue)} disabled={isPast} className={`calendar-day ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`} key={dateValue} onClick={() => chooseCalendarDate(day)}>{day}</button>; })())}</div><p id={errors.date ? "date-error" : "date-help"} className={errors.date ? "field-error" : "field-help"}>{errors.date || (draft.date ? `Seçilen tarih: ${displayDate(draft.date)}` : "Geçmiş günler seçilemez. Takvimden bir gün seçin.")}</p></div>}
+            {step === 2 && <div className="calendar-step"><div className="calendar-head"><button type="button" aria-label="Önceki ay" disabled={Boolean(today && calendarMonth.year === Number(today.slice(0, 4)) && calendarMonth.month === Number(today.slice(5, 7)) - 1)} onClick={() => setCalendarMonth((month) => { const previous = new Date(Date.UTC(month.year, month.month - 1, 1)); return { year: previous.getUTCFullYear(), month: previous.getUTCMonth() }; })}>←</button><h3>{new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: bookingTimeZone }).format(new Date(Date.UTC(calendarMonth.year, calendarMonth.month, 1, 12)))}</h3><button type="button" aria-label="Sonraki ay" onClick={() => setCalendarMonth((month) => { const next = new Date(Date.UTC(month.year, month.month + 1, 1)); return { year: next.getUTCFullYear(), month: next.getUTCMonth() }; })}>→</button></div><div className="calendar-grid" role="group" aria-label="Tarih seçimi">{weekdays.map((day) => <span className="calendar-weekday" key={day}>{day}</span>)}{calendarCells.map((day, index) => day === null ? <span className="calendar-empty" key={`empty-${index}`} aria-hidden="true"></span> : (() => { const dateValue = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const isPast = Boolean(today && dateValue < today); const isFutureLocked = Boolean(today && dateValue > addCalendarDays(today, 7)); const isDateDisabled = isPast || isFutureLocked; const isSelected = draft.date === dateValue; const isToday = Boolean(today && dateValue === today); return <button type="button" aria-pressed={isSelected} aria-label={isFutureLocked ? `${displayDate(dateValue)} — henüz randevuya açılmadı` : displayDate(dateValue)} title={isFutureLocked ? "Henüz randevuya açılmadı" : undefined} disabled={isDateDisabled} className={`calendar-day ${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${isPast ? "past-date" : ""} ${isFutureLocked ? "future-unavailable" : ""}`} key={dateValue} onClick={() => chooseCalendarDate(day)}>{isFutureLocked && <span className="calendar-lock" aria-hidden="true"><svg viewBox="0 0 12 12" fill="none"><path d="M3.5 5V3.75a2.5 2.5 0 0 1 5 0V5" stroke="currentColor" strokeWidth="1" /><rect x="2.5" y="5" width="7" height="5.5" rx="1" stroke="currentColor" strokeWidth="1" /><path d="M6 7v1.5" stroke="currentColor" strokeWidth="1" /></svg></span>}{day}</button>; })())}</div><p id={errors.date ? "date-error" : "date-help"} className={errors.date ? "field-error" : "field-help"}>{errors.date || (draft.date ? `Seçilen tarih: ${displayDate(draft.date)}` : "Bugün ve sonraki 7 gün içinde bir tarih seçin.")}</p></div>}
 
             {step === 3 && <div className="time-step"><div className="preview-day"><span>{displayDate(draft.date)}</span><span>{selectedBarber?.name} · {selectedService ? formatDuration(selectedService.durationMinutes) : ""}</span></div><p className="field-help">08:00–20:00 çalışma aralığı · 10 dakikalık başlangıç aralıkları</p><div className="availability-test-note"><strong>Test / önizleme doluluğu</strong><span>Berber 1 · 10 Aralık 2026 · Saç Kesimi · 15:20–15:50</span><span>Yalnızca bu berber ve tarihte örnek olarak uygulanır; gerçek rezervasyon değildir.</span></div><div className="time-grid" role="radiogroup" aria-label="Örnek başlangıç saati">
               {timeSlots.map((slot) => { const occupied = isOccupied(slot); const hourStart = slot.endsWith(":00"); return <button type="button" role="radio" aria-checked={draft.time === slot} aria-disabled={occupied} disabled={occupied} title={occupied ? "Test verisindeki randevuyla çakışıyor" : undefined} className={`time-option ${hourStart ? "hour-start" : ""} ${occupied ? "occupied" : ""} ${draft.time === slot ? "selected" : ""}`} key={slot} onClick={() => select("time", slot)}>{slot}</button>; })}

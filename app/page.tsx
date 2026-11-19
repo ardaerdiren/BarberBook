@@ -96,7 +96,7 @@ export default function Home() {
       </section>
 
       <section className="booking-section" id="randevu">
-        <div className="shell booking-inner"><div><p className="eyebrow"><span className="eyebrow-line"></span> RANDEVU ÖNİZLEMESİ</p><h2>Bir sonraki iyi<br /><em>kesiminiz</em> için.</h2><p>Berberinizi ve hizmetinizi seçerek randevu akışını keşfedin. Bu önizleme randevu kaydetmez.</p><a className="button booking-home-cta" href="/randevu">Akışı Görüntüle <span aria-hidden="true">↗</span></a></div><span className="booking-seal">BB<br /><i>✳</i></span></div>
+        <div className="shell booking-inner"><div><p className="eyebrow"><span className="eyebrow-line"></span> RANDEVU ÖNİZLEMESİ</p><h2>Bir sonraki iyi<br /><em>kesiminiz</em> için.</h2><p>Berberinizi ve hizmetinizi seçerek randevu akışını keşfedin. Bu önizleme randevu kaydetmez.</p><a className="button booking-home-cta" href="/randevu">Akışı Görüntüle <span aria-hidden="true">↗</span></a></div><div className="booking-illustration" aria-hidden="true"><svg className="booking-scissors" viewBox="0 0 700 500" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="147" cy="143" r="63" /><circle cx="147" cy="357" r="63" /><path d="M195 183 309 250 554 78M195 317 309 250 554 422" /><circle className="scissors-pivot" cx="309" cy="250" r="10" /><path className="scissors-detail" d="M420 170 522 98M420 330 522 402" /></svg><span className="booking-seal">BB<br /><i>✳</i></span></div></div>
       </section>
 
       <footer className="site-footer" id="iletisim">
