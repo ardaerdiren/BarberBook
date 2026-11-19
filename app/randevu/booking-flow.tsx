@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import { barbers, formatDuration, formatPrice, services } from "../lib/booking/catalog";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { formatDuration, formatPrice } from "../lib/booking/catalog";
 
 const stepNames = ["Berber", "Hizmet", "Tarih", "Saat", "Bilgiler", "Özet"];
 const stepHints = [
@@ -23,6 +23,30 @@ type BookingDraft = {
   phone: string;
 };
 type CalendarMonth = { year: number; month: number };
+type Barber = { id: string; name: string };
+type BookingService = { id: string; name: string; durationMinutes: number; price: number };
+
+function isBarberArray(value: unknown): value is Barber[] {
+  return Array.isArray(value) && value.every((item: unknown) =>
+    typeof item === "object" && item !== null &&
+    "id" in item && typeof item.id === "string" &&
+    "name" in item && typeof item.name === "string",
+  );
+}
+
+function isServiceArray(value: unknown): value is BookingService[] {
+  return Array.isArray(value) && value.every((item: unknown) =>
+    typeof item === "object" && item !== null &&
+    "id" in item && typeof item.id === "string" &&
+    "name" in item && typeof item.name === "string" &&
+    "durationMinutes" in item && Number.isInteger(item.durationMinutes) &&
+    "price" in item && Number.isInteger(item.price),
+  );
+}
+
+function isCampaignService(service: BookingService) {
+  return service.name === "Saç + Sakal + Bakım";
+}
 
 const initialDraft: BookingDraft = { barberId: "", serviceId: "", date: "", time: "", name: "", phone: "" };
 const sampleAppointment = {
@@ -89,8 +113,68 @@ export default function BookingFlow() {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<BookingDraft>(initialDraft);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [barbers, setBarbers] = useState<Barber[]>([]);
+  const [barbersLoading, setBarbersLoading] = useState(true);
+  const [barbersError, setBarbersError] = useState("");
+  const [services, setServices] = useState<BookingService[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState("");
   const [today, setToday] = useState("");
   const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>({ year: 2000, month: 0 });
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadBarbers() {
+      try {
+        const response = await fetch("/api/barbers", { signal: controller.signal });
+        if (!response.ok) throw new Error("Barber API request failed.");
+
+        const result: unknown = await response.json();
+        if (!isBarberArray(result)) {
+          throw new Error("Barber API returned an invalid response.");
+        }
+
+        setBarbers(result);
+      } catch {
+        if (!controller.signal.aborted) {
+          setBarbersError("Berber listesi şu anda yüklenemiyor. Lütfen daha sonra tekrar deneyin.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setBarbersLoading(false);
+      }
+    }
+
+    void loadBarbers();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadServices() {
+      try {
+        const response = await fetch("/api/services", { signal: controller.signal });
+        if (!response.ok) throw new Error("Service API request failed.");
+
+        const result: unknown = await response.json();
+        if (!isServiceArray(result)) {
+          throw new Error("Service API returned an invalid response.");
+        }
+
+        setServices(result);
+      } catch {
+        if (!controller.signal.aborted) {
+          setServicesError("Hizmet listesi şu anda yüklenemiyor. Lütfen daha sonra tekrar deneyin.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setServicesLoading(false);
+      }
+    }
+
+    void loadServices();
+    return () => controller.abort();
+  }, []);
+
   const selectedBarber = barbers.find((barber) => barber.id === draft.barberId);
   const selectedService = services.find((service) => service.id === draft.serviceId);
   const timeSlots = useMemo(
@@ -248,13 +332,32 @@ export default function BookingFlow() {
               <p>{stepHints[step]}</p>
             </div>
 
-            {step === 0 && <fieldset role="radiogroup" className="choice-grid barber-grid"><legend className="visually-hidden">Berber seçin</legend>
-              {barbers.map((barber, index) => <button type="button" role="radio" aria-checked={draft.barberId === barber.id} className={`choice-card barber-choice ${draft.barberId === barber.id ? "selected" : ""}`} key={barber.id} onClick={() => select("barberId", barber.id)}><span className="choice-index">BERBER · 0{index + 1}</span><span className="barber-avatar" aria-hidden="true">{barber.name.slice(-1)}</span><strong>{barber.name}</strong><span className="choice-detail">Usta berber</span></button>)}
-            </fieldset>}
+            {step === 0 && (barbersLoading ? (
+              <p className="field-help" role="status" aria-live="polite">Berber listesi yükleniyor…</p>
+            ) : barbersError ? (
+              <p className="field-error" role="alert">{barbersError}</p>
+            ) : barbers.length === 0 ? (
+              <p className="field-help" role="status">Şu anda aktif berber bulunmuyor.</p>
+            ) : (
+              <fieldset role="radiogroup" className="choice-grid barber-grid"><legend className="visually-hidden">Berber seçin</legend>
+                {barbers.map((barber, index) => <button type="button" role="radio" aria-checked={draft.barberId === barber.id} className={`choice-card barber-choice ${draft.barberId === barber.id ? "selected" : ""}`} key={barber.id} onClick={() => select("barberId", barber.id)}><span className="choice-index">BERBER · 0{index + 1}</span><span className="barber-avatar" aria-hidden="true">{barber.name.slice(-1)}</span><strong>{barber.name}</strong><span className="choice-detail">Usta berber</span></button>)}
+              </fieldset>
+            ))}
 
-            {step === 1 && <fieldset role="radiogroup" className="choice-grid service-choice-grid"><legend className="visually-hidden">Hizmet seçin</legend>
-              {services.map((service) => <button type="button" role="radio" aria-checked={draft.serviceId === service.id} className={`choice-card service-choice ${draft.serviceId === service.id ? "selected" : ""} ${service.id === "complete-care" ? "campaign-choice" : ""}`} key={service.id} onClick={() => select("serviceId", service.id)}><span className="choice-index">HİZMET · {service.number}</span>{service.id === "complete-care" && <span className="campaign-label">Kampanyalı Paket</span>}<strong>{service.name}</strong><span className="choice-detail">{formatDuration(service.durationMinutes)}</span><span className="choice-price">{formatPrice(service.priceTry)}</span></button>)}
-            </fieldset>}
+            {step === 1 && (servicesLoading ? (
+              <p className="field-help" role="status" aria-live="polite">Hizmet listesi yükleniyor…</p>
+            ) : servicesError ? (
+              <p className="field-error" role="alert">{servicesError}</p>
+            ) : services.length === 0 ? (
+              <p className="field-help" role="status">Şu anda aktif hizmet bulunmuyor.</p>
+            ) : (
+              <fieldset role="radiogroup" className="choice-grid service-choice-grid"><legend className="visually-hidden">Hizmet seçin</legend>
+                {services.map((service, index) => {
+                  const campaign = isCampaignService(service);
+                  return <button type="button" role="radio" aria-checked={draft.serviceId === service.id} className={`choice-card service-choice ${draft.serviceId === service.id ? "selected" : ""} ${campaign ? "campaign-choice" : ""}`} key={service.id} onClick={() => select("serviceId", service.id)}><span className="choice-index">HİZMET · 0{index + 1}</span>{campaign && <span className="campaign-label">Kampanyalı Paket</span>}<strong>{service.name}</strong><span className="choice-detail">{formatDuration(service.durationMinutes)}</span><span className="choice-price">{formatPrice(service.price)}</span></button>;
+                })}
+              </fieldset>
+            ))}
 
             {step === 2 && <div className="calendar-step"><div className="calendar-head"><button type="button" aria-label="Önceki ay" disabled={Boolean(today && calendarMonth.year === Number(today.slice(0, 4)) && calendarMonth.month === Number(today.slice(5, 7)) - 1)} onClick={() => setCalendarMonth((month) => { const previous = new Date(month.year, month.month - 1, 1); return { year: previous.getFullYear(), month: previous.getMonth() }; })}>←</button><h3>{new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(calendarMonth.year, calendarMonth.month, 1))}</h3><button type="button" aria-label="Sonraki ay" onClick={() => setCalendarMonth((month) => { const next = new Date(month.year, month.month + 1, 1); return { year: next.getFullYear(), month: next.getMonth() }; })}>→</button></div><div className="calendar-grid" role="group" aria-label="Tarih seçimi">{weekdays.map((day) => <span className="calendar-weekday" key={day}>{day}</span>)}{calendarCells.map((day, index) => day === null ? <span className="calendar-empty" key={`empty-${index}`} aria-hidden="true"></span> : (() => { const dateValue = `${calendarMonth.year}-${String(calendarMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; const isPast = Boolean(today && dateValue < today); const isSelected = draft.date === dateValue; const isToday = Boolean(today && dateValue === today); return <button type="button" aria-pressed={isSelected} aria-label={displayDate(dateValue)} disabled={isPast} className={`calendar-day ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`} key={dateValue} onClick={() => chooseCalendarDate(day)}>{day}</button>; })())}</div><p id={errors.date ? "date-error" : "date-help"} className={errors.date ? "field-error" : "field-help"}>{errors.date || (draft.date ? `Seçilen tarih: ${displayDate(draft.date)}` : "Geçmiş günler seçilemez. Takvimden bir gün seçin.")}</p></div>}
 
@@ -264,7 +367,7 @@ export default function BookingFlow() {
 
             {step === 4 && <div className="customer-fields"><div className="field-group"><label htmlFor="customer-name">Ad ve soyad</label><input id="customer-name" name="name" type="text" autoComplete="name" maxLength={100} value={draft.name} aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? "name-error" : undefined} onChange={changeName} onBlur={finishName} placeholder="Adınızı ve soyadınızı yazın" />{errors.name && <p id="name-error" className="field-error" role="alert">{errors.name}</p>}</div><div className="field-group"><label htmlFor="customer-phone">Telefon numarası</label><div className="phone-input-wrap"><span className="phone-prefix" aria-hidden="true">+90</span><input id="customer-phone" name="tel-national" type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={12} value={formatNationalPhone(draft.phone)} aria-invalid={Boolean(errors.phone)} aria-describedby={errors.phone ? "phone-error" : "phone-help"} onChange={changePhone} onKeyDown={(event) => { if (event.ctrlKey || event.metaKey || event.altKey || ["Backspace", "Delete", "Tab", "Enter", "ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key) || /^\d$/.test(event.key)) return; event.preventDefault(); }} placeholder="5__ ___ ____" /><span className="visually-hidden">Ülke kodu +90 sabittir. 5 ile başlayan 10 rakam girin.</span></div><p id={errors.phone ? "phone-error" : "phone-help"} className={errors.phone ? "field-error" : "field-help"}>{errors.phone || "+90 sabit ülke kodudur; 5 ile başlayan 10 rakam girin. Bilgiler kaydedilmez."}</p></div></div>}
 
-            {step === 5 && <div className="summary-card"><div className="summary-notice">Bu, kaydedilmeyen bir randevu önizlemesidir.</div><dl><div><dt>Berber</dt><dd>{selectedBarber?.name}</dd></div><div><dt>Hizmet</dt><dd>{selectedService?.name}{selectedService?.id === "complete-care" && <span className="summary-campaign">Kampanyalı Paket</span>}</dd></div><div><dt>Süre</dt><dd>{selectedService ? formatDuration(selectedService.durationMinutes) : ""}</dd></div><div><dt>Fiyat</dt><dd className="summary-price">{selectedService ? formatPrice(selectedService.priceTry) : ""}</dd></div><div><dt>Tarih</dt><dd>{displayDate(draft.date)}</dd></div><div><dt>Saat</dt><dd>{draft.time}–{selectedService ? (() => { const [hours, minutes] = draft.time.split(":").map(Number); const end = hours * 60 + minutes + selectedService.durationMinutes; return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`; })() : ""}</dd></div><div><dt>Müşteri</dt><dd>{draft.name}</dd></div><div><dt>Telefon</dt><dd>+90 {formatNationalPhone(draft.phone)}</dd></div></dl></div>}
+            {step === 5 && <div className="summary-card"><div className="summary-notice">Bu, kaydedilmeyen bir randevu önizlemesidir.</div><dl><div><dt>Berber</dt><dd>{selectedBarber?.name}</dd></div><div><dt>Hizmet</dt><dd>{selectedService?.name}{selectedService && isCampaignService(selectedService) && <span className="summary-campaign">Kampanyalı Paket</span>}</dd></div><div><dt>Süre</dt><dd>{selectedService ? formatDuration(selectedService.durationMinutes) : ""}</dd></div><div><dt>Fiyat</dt><dd className="summary-price">{selectedService ? formatPrice(selectedService.price) : ""}</dd></div><div><dt>Tarih</dt><dd>{displayDate(draft.date)}</dd></div><div><dt>Saat</dt><dd>{draft.time}–{selectedService ? (() => { const [hours, minutes] = draft.time.split(":").map(Number); const end = hours * 60 + minutes + selectedService.durationMinutes; return `${String(Math.floor(end / 60)).padStart(2, "0")}:${String(end % 60).padStart(2, "0")}`; })() : ""}</dd></div><div><dt>Müşteri</dt><dd>{draft.name}</dd></div><div><dt>Telefon</dt><dd>+90 {formatNationalPhone(draft.phone)}</dd></div></dl></div>}
 
             <div className="booking-controls">{step > 0 ? <button type="button" className="booking-previous" onClick={goBack}>← <span>Geri</span></button> : <span></span>}{step < stepNames.length - 1 && <button type="submit" className="button booking-next">{step === 4 ? "Özeti Görüntüle" : "Devam Et"} <span aria-hidden="true">→</span></button>}</div>
           </form>

@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CANCELLED
+}
+
+model Barber {
+  id           String        @id @default(cuid())
+  name         String
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
+}
+
+model Service {
+  id               String        @id @default(cuid())
+  name             String
+  durationMinutes  Int
+  price            Int
+  isActive         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  appointments     Appointment[]
+}
+
+model Customer {
+  id           String        @id @default(cuid())
+  fullName     String
+  phone        String        @unique
+  createdAt    DateTime      @default(now())
+  appointments Appointment[]
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  barberId       String
+  serviceId      String
+  customerId     String
+  startAt        DateTime          @db.Timestamptz(3)
+  endAt          DateTime          @db.Timestamptz(3)
+  // These values are snapshots from booking time, independent of later catalog edits.
+  price          Int
+  durationMinutes Int
+  status         AppointmentStatus @default(BOOKED)
+  createdAt      DateTime          @default(now())
+
+  barber   Barber   @relation(fields: [barberId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}

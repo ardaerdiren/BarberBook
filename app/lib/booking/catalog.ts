@@ -15,12 +15,6 @@ export const services: Service[] = [
   { id: "complete-care", number: "05", name: "Saç + Sakal + Bakım", description: "Tam bir berber deneyimi, tek seansta.", durationMinutes: 80, priceTry: 1000 },
 ];
 
-export const barbers = [
-  { id: "barber-1", name: "Berber 1" },
-  { id: "barber-2", name: "Berber 2" },
-  { id: "barber-3", name: "Berber 3" },
-] as const;
-
 export function formatPrice(priceTry: number) {
   return `${new Intl.NumberFormat("tr-TR").format(priceTry)} TL`;
 }
